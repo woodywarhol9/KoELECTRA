@@ -115,26 +115,25 @@ def train(args,
                     else:
                         evaluate(args, model, dev_dataset, "dev", global_step)
 
-                if args.save_steps > 0 and global_step % args.save_steps == 0:
-                    # Save model checkpoint
-                    output_dir = os.path.join(args.output_dir, "checkpoint-{}".format(global_step))
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
-                    model_to_save = (
-                        model.module if hasattr(model, "module") else model
-                    )
-                    model_to_save.save_pretrained(output_dir)
-
-                    torch.save(args, os.path.join(output_dir, "training_args.bin"))
-                    logger.info("Saving model checkpoint to {}".format(output_dir))
-
-                    if args.save_optimizer:
-                        torch.save(optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
-                        torch.save(scheduler.state_dict(), os.path.join(output_dir, "scheduler.pt"))
-                        logger.info("Saving optimizer and scheduler states to {}".format(output_dir))
-
             if args.max_steps > 0 and global_step > args.max_steps:
                 break
+        # 1 epoch 마다 저장하게 코드 수정
+        # Save model checkpoint
+        output_dir = os.path.join(args.output_dir, "checkpoint-{}".format(global_step))
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        model_to_save = (
+            model.module if hasattr(model, "module") else model
+        )
+        model_to_save.save_pretrained(output_dir)
+
+        torch.save(args, os.path.join(output_dir, "training_args.bin"))
+        logger.info("Saving model checkpoint to {}".format(output_dir))
+
+        if args.save_optimizer:
+            torch.save(optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
+            torch.save(scheduler.state_dict(), os.path.join(output_dir, "scheduler.pt"))
+            logger.info("Saving optimizer and scheduler states to {}".format(output_dir))
 
         mb.write("Epoch {} done".format(epoch + 1))
 
