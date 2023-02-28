@@ -109,14 +109,14 @@ def train(args,
                 model.zero_grad()
                 global_step += 1
 
-                if args.logging_steps > 0 and global_step % args.logging_steps == 0:
-                    if args.evaluate_test_during_training:
-                        evaluate(args, model, test_dataset, "test", global_step)
-                    else:
-                        evaluate(args, model, dev_dataset, "dev", global_step)
-
             if args.max_steps > 0 and global_step > args.max_steps:
                 break
+        # 1 epoch 마다 저장하게 코드 수정
+        if args.logging_steps > 0:
+            if args.evaluate_test_during_training:
+                evaluate(args, model, test_dataset, "test", global_step)
+            else:
+                evaluate(args, model, dev_dataset, "dev", global_step)
         # 1 epoch 마다 저장하게 코드 수정
         # Save model checkpoint
         output_dir = os.path.join(args.output_dir, "checkpoint-{}".format(global_step))
@@ -159,7 +159,8 @@ def evaluate(args, model, eval_dataset, mode, global_step=None):
     nb_eval_steps = 0
     preds = None
     out_label_ids = None
-
+    # step 별 Loss 저장
+    eval_loss_list = []
     for batch in progress_bar(eval_dataloader):
         model.eval()
         batch = tuple(t.to(args.device) for t in batch)
@@ -174,8 +175,9 @@ def evaluate(args, model, eval_dataset, mode, global_step=None):
                 inputs["token_type_ids"] = batch[2]  # Distilkobert, XLM-Roberta don't use segment_ids
             outputs = model(**inputs)
             tmp_eval_loss, logits = outputs[:2]
-
             eval_loss += tmp_eval_loss.mean().item()
+            # step 별 Loss 저장
+            eval_loss_list.append(tmp_eval_loss.mean().item())
         nb_eval_steps += 1
         if preds is None:
             preds = logits.detach().cpu().numpy()
@@ -185,12 +187,16 @@ def evaluate(args, model, eval_dataset, mode, global_step=None):
             out_label_ids = np.append(out_label_ids, inputs["labels"].detach().cpu().numpy(), axis=0)
 
     eval_loss = eval_loss / nb_eval_steps
+    eval_loss_list.append(eval_loss)
+
     if output_modes[args.task] == "classification":
         preds = np.argmax(preds, axis=1)
     elif output_modes[args.task] == "regression":
         preds = np.squeeze(preds)
     result = compute_metrics(args.task, out_label_ids, preds)
     results.update(result)
+    # step 별 Loss 저장
+    results['loss'] = eval_loss_list
 
     output_dir = os.path.join(args.output_dir, mode)
     if not os.path.exists(output_dir):
